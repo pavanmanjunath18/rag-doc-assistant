@@ -225,10 +225,50 @@ sources, and the model isn't called.
 **Tradeoff:** A client has to read the text to tell this apart from a real answer. If that
 becomes a problem, add a field rather than an error code.
 
+## D22. Document ID = SHA-256 of the file's bytes (Stage 3)
+
+**Decision:** `document_id(path)` hashes the raw bytes. Chunk IDs are `<doc_id>:<index>`, and
+each chunk's metadata stores `doc_id`, `source` (the file name) and `chunk`.
+**Why:** The same bytes always get the same ID, so "have I seen this?" is one lookup, done
+before any parsing or embedding.
+**Alternatives:** The file name (the Stage 1 approach: can't tell versions apart, which caused
+stale chunks); a hash of the extracted text (would also match a re-saved PDF with identical
+text, but needs parsing first and changes if the PDF library changes); a random UUID (no
+dedup at all).
+**Tradeoff:** Byte-level: re-exporting the same PDF can change a timestamp inside it and give a
+new ID. That just re-indexes it as a replacement, which is wasted work, not wrong results.
+
+## D23. Same content under a different name is a no-op (Stage 3)
+
+**Decision:** If the bytes are already indexed under another name, nothing is stored, and the
+response reports the existing name with status `unchanged`.
+**Why:** Indexing it again would put identical chunks in the store twice, and they would crowd
+out other results in the top 3.
+**Tradeoff:** Citations keep showing the first name the content was uploaded under.
+
+## D24. Store the new version first, then delete the old one (Stage 3)
+
+**Decision:** For a changed file with a known name: embed and store the new chunks, then
+delete every chunk under that name whose `doc_id` isn't the new one.
+**Why:** If embedding or storing fails, the old version is still there and searchable. The
+opposite order would leave the document missing after a failure.
+**Tradeoff:** Chroma has no multi-step transactions. For a moment both versions are searchable,
+and if the process died between the two steps both would stay until that name is uploaded
+again (which deletes everything except the current version, so it heals itself).
+**Bonus:** Chunks written by Stages 1 and 2 have no `doc_id`, so they count as stale and are
+cleaned up automatically on the next ingest. Verified on the real index: 35 old-format chunks
+became 35 new ones, 0 left behind.
+
+## D25. 200 for "already indexed", 201 for "indexed" (Stage 3)
+
+**Decision:** `POST /documents` returns `status` (`indexed`, `replaced` or `unchanged`) and
+`document_id`. The HTTP code is 201 when something was stored, 200 when nothing changed.
+**Why:** Clients (and the UI) can tell a duplicate upload from a real one without comparing
+chunk counts.
+**Known gap:** Two uploads of the same file name at the same moment could interleave their
+store and delete steps. Stage 4 runs ingestion jobs one at a time, which removes that race.
+
 ## Deferred to later stages
 
-- **Stale chunks** (Stage 3): chunk IDs are `filename:index`, so re-uploading a shorter
-  version of a file leaves its old tail chunks behind, and re-uploading an identical file
-  re-embeds it for nothing.
 - **Uploads block the request** (Stage 4): `/documents` indexes before responding. Fine for the
   10-K sections (under a second each); a long PDF would hold the request open.

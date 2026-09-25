@@ -28,7 +28,7 @@ uvicorn --factory api.app:create_app --port 8000
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | Status and number of indexed chunks |
-| `POST /documents` | Upload a `.pdf`, `.txt` or `.md` file (multipart field `file`) and index it |
+| `POST /documents` | Upload a `.pdf`, `.txt` or `.md` file (multipart field `file`) and index it. Re-uploading identical content is a no-op; a changed file with the same name replaces its old chunks |
 | `POST /query` | `{"question": "...", "top_k": 3, "use_rag": true}` returns an answer with its sources |
 
 Interactive API docs: `http://127.0.0.1:8000/docs`.
