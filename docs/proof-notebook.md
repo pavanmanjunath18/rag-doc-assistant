@@ -58,7 +58,10 @@ and cell 9 shows the revised prompt in its code but the old refusal in its outpu
 screen did not match the code above it. This is one reason the evaluation in this repo is a
 script that runs top to bottom in a fresh process.
 
-## Not covered by the notebook
+## How these map to the README's "Failures I hit"
 
-The PDF extraction failure and the CPU-vs-GPU runtime failure happened during the proof
-project but are not recorded in the notebook. They will be written up from memory in Stage 8.
+The README lists four failures. Three are documented directly in the notebook: the
+extraction failure (the model not pulling an answer out of the right chunk, cell 11), stale
+cells, and the debt over-synthesis. The notebook only shows the GPU checks for the fourth
+(CPU vs GPU), so the README tells it through the version of it that came back in this repo on
+a Mac, where it was measured (D12, D39).

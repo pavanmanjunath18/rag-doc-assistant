@@ -1,6 +1,7 @@
 # Docs
 
-Start here if you are new to the project (or explaining it to someone).
+Start here if you are new to the project (or explaining it to someone). For a quick
+overview read the [main README](../README.md) first, then the stage notes in order.
 
 | Doc | What it is |
 |---|---|
@@ -16,3 +17,5 @@ Start here if you are new to the project (or explaining it to someone).
 4. [Stage 4: background ingestion jobs](stages/stage-4-background-jobs.md)
 5. [Stage 5: evaluation harness](stages/stage-5-evaluation.md)
 6. [Stage 6: React frontend](stages/stage-6-frontend.md)
+7. [Stage 7: Docker and CI](stages/stage-7-packaging.md)
+8. [Stage 8: README and docs](stages/stage-8-docs.md)
