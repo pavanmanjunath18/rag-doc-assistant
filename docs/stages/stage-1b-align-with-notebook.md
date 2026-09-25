@@ -148,4 +148,4 @@ python cli.py ask "How much debt does Netflix have?" --no-rag
   generation will be much slower.
 - `accelerate` is no longer a dependency. If you add `device_map=` back, you'll need it again.
 - If a prompt change "should" work but the model refuses, first check what was retrieved
-  (`store.search`) before touching the prompt.
+  (the sources printed with the answer) before touching the prompt.

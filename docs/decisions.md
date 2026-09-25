@@ -137,10 +137,98 @@ correctness, not just speed.
 matter for a 1.5B model, and a clear out-of-memory error is easier to debug than silent disk
 offload.
 
+## D13. Small interfaces, passed in (Stage 2)
+
+**Decision:** `rag/interfaces.py` defines three `Protocol`s: `Embedder`, `VectorStore` and
+`Generator`. `RagPipeline` receives one of each in its constructor. `rag/factory.py` is the one
+place that builds the real ones (MiniLM, Chroma, Qwen).
+**Why:** Stage 1 used global `lru_cache` loaders, so any code that touched the pipeline loaded
+a 3 GB model. Now tests pass fakes (84 tests in under a second, no model), and a later AWS
+version can pass a Bedrock generator or a different vector store without editing the pipeline.
+**Alternatives:** Abstract base classes (need inheritance; a `Protocol` just needs the right
+methods); a dependency-injection framework (overkill for three objects).
+**Tradeoff:** A little more code and one more file than calling the models directly.
+
+## D14. The store takes vectors; it doesn't embed (Stage 2)
+
+**Decision:** `VectorStore.add` and `search` take embeddings. The pipeline does the
+embedding. In Stage 1 the store called the embedder itself.
+**Why:** Each part does one job, so either can be replaced alone (for example, keep MiniLM
+but move to a hosted vector database).
+
+## D15. The API is a thin layer in its own package (Stage 2)
+
+**Decision:** `api/` holds only HTTP concerns: routes, request/response models, upload
+checks. It calls the same `RagPipeline` the CLI uses. `rag/` never imports FastAPI.
+**Why:** The core logic is tested once and reused by both front ends. A future Lambda handler
+would be a third thin layer on the same core.
+
+## D16. Load models once at startup and fail fast (Stage 2)
+
+**Decision:** The FastAPI `lifespan` hook builds the pipeline before the server accepts
+requests. If a model fails to load, the server doesn't start.
+**Why:** Loading per request would add seconds to every call. Failing at startup means that
+`/health` returning `ok` actually means ready. Catching the error and starting anyway would
+only move the failure to the first request.
+**Tradeoff:** Startup takes a few seconds (both models load before the port opens).
+
+## D17. Plain `def` endpoints, one generation at a time (Stage 2)
+
+**Decision:** Endpoints are `def`, not `async def`, and `HuggingFaceGenerator` holds a lock
+around `generate()`.
+**Why:** Embedding and generation block the CPU/GPU. FastAPI runs `def` endpoints in a thread
+pool, so a slow answer doesn't freeze `/health` or other requests. `async def` with blocking
+calls inside would stall the whole server. There is one model instance shared by all threads,
+so the lock stops two requests from running it at the same time.
+**Tradeoff:** Answers are produced one at a time. Fine for a local tool; at real scale you'd
+use a model server that batches requests, or a hosted model.
+
+## D18. Upload checks in layers (Stage 2)
+
+**Decision:** Every upload goes through, in order:
+1. Filename sanitized: directory parts dropped (blocks `../../` path traversal), only
+   `A-Z a-z 0-9 . _ -` kept, length capped at 100 with the extension kept.
+2. Extension allowlist: `.pdf`, `.txt`, `.md` (otherwise 415).
+3. Size limit while copying: read in 1 MB blocks, stop once past `MAX_UPLOAD_MB` (413).
+   Empty files are rejected (400).
+4. Content check: a `.pdf` must start with `%PDF-`, and a text file must not contain NUL bytes
+   (415). The name alone proves nothing.
+5. Written to a temp file first, indexed, then renamed into place. Any failure deletes the
+   temp file, so a rejected upload leaves nothing behind.
+6. Unreadable or textless documents get a 422 with the loader's message.
+
+**Known gap:** Starlette parses the multipart body (spooling it to a temp file) *before* our
+code runs, so the size limit stops us from storing a huge file but not from receiving it. In
+production this limit belongs in front of the app too (a reverse proxy's body-size limit, or an
+API gateway's payload limit). The content check is also a sanity check, not a malware scan.
+
+## D19. Status codes and error format (Stage 2)
+
+**Decision:** 201 for a created document, 400 empty file, 413 too large, 415 wrong type,
+422 invalid request or unreadable document. Errors use FastAPI's standard `{"detail": ...}`.
+`QueryRequest` rejects unknown fields, so a typo like `topk` is an error instead of being
+silently ignored.
+
+## D20. Settings as one object (Stage 2)
+
+**Decision:** `Settings` is a frozen dataclass built by `Settings.from_env()`. It replaced the
+module-level constants of Stage 1.
+**Why:** Tests create their own `Settings` (temp folders, 1 MB upload limit) without touching
+environment variables. A bad value such as `TOP_K=three` fails at startup with the variable's
+name in the message.
+
+## D21. Asking with nothing indexed is not an error (Stage 2)
+
+**Decision:** `/query` on an empty index returns 200 with "No documents indexed yet." and no
+sources, and the model isn't called.
+**Why:** The request itself is valid, and the UI can show the message as-is.
+**Tradeoff:** A client has to read the text to tell this apart from a real answer. If that
+becomes a problem, add a field rather than an error code.
+
 ## Deferred to later stages
 
-- **Stale chunks** (Stage 3): chunk IDs are `filename:index`, so re-ingesting a shorter version
-  of a file leaves its old tail chunks behind.
-- **Global model singletons** (Stage 2): `lru_cache` loaders get replaced by small interfaces
-  (`Embedder`, `Generator`, `VectorStore`) passed in at startup. This makes testing with fakes
-  easy and is the seam for swapping in AWS services later.
+- **Stale chunks** (Stage 3): chunk IDs are `filename:index`, so re-uploading a shorter
+  version of a file leaves its old tail chunks behind, and re-uploading an identical file
+  re-embeds it for nothing.
+- **Uploads block the request** (Stage 4): `/documents` indexes before responding. Fine for the
+  10-K sections (under a second each); a long PDF would hold the request open.
