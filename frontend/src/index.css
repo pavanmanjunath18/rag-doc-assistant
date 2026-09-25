@@ -1,0 +1,261 @@
+:root {
+  --text: #1f2328;
+  --muted: #59636e;
+  --bg: #f6f8fa;
+  --panel: #ffffff;
+  --border: #d1d9e0;
+  --accent: #0b5cad;
+  --accent-text: #ffffff;
+  --ok: #1a7f37;
+  --ok-bg: #dafbe1;
+  --warn: #9a6700;
+  --warn-bg: #fff8c5;
+  --bad: #cf222e;
+  --bad-bg: #ffebe9;
+  --code-bg: #f6f8fa;
+
+  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #e6edf3;
+    --muted: #9198a1;
+    --bg: #0d1117;
+    --panel: #151b23;
+    --border: #3d444d;
+    --accent: #4493f8;
+    --accent-text: #0d1117;
+    --ok: #3fb950;
+    --ok-bg: #12261e;
+    --warn: #d29922;
+    --warn-bg: #272115;
+    --bad: #f85149;
+    --bad-bg: #25171c;
+    --code-bg: #0d1117;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1.1rem;
+  margin: 0 0 12px;
+}
+
+h3 {
+  font-size: 0.95rem;
+  margin: 20px 0 8px;
+}
+
+.status,
+.hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.hint {
+  margin-top: 8px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.upload-form,
+.ask-form {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.upload-form label {
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-form input[type='file'] {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+}
+
+textarea {
+  flex: 1;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+textarea:focus-visible,
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.uploads {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+}
+
+.upload {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.filename {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  font-size: 0.85rem;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.badge.queued,
+.badge.running {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.badge.succeeded {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.badge.failed,
+.error {
+  color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.error {
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.answer {
+  margin-top: 16px;
+}
+
+.asked {
+  color: var(--muted);
+  margin: 0 0 4px;
+}
+
+.answer-text {
+  white-space: pre-wrap;
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.sources ol {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.sources li {
+  margin-bottom: 6px;
+}
+
+summary {
+  cursor: pointer;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-left: 8px;
+}
+
+.chunk {
+  white-space: pre-wrap;
+  font: 0.85rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 8px 0 0;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .ask-form,
+  .upload-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
