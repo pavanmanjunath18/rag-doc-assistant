@@ -404,3 +404,51 @@ long-lived connection type to the server for no visible gain here.
 `api/schemas.py`.
 **Tradeoff:** They can drift from the Pydantic models. Generating them from FastAPI's OpenAPI
 schema would remove that risk; with five small types, hand-written is easier to read.
+
+## D39. CPU-only PyTorch in the Docker image (Stage 7)
+
+**Decision:** The API image installs PyTorch from the CPU wheel index.
+**Why:** Docker on a Mac can't use the Apple GPU, and the CPU wheel is far smaller than the
+default CUDA build. The app already picks the device at startup (D12), so the same image
+would use a GPU where one is passed through.
+**Tradeoff, measured:** In Docker on the Mac, one answer took about 39 s on CPU (float32),
+against about 2 s outside Docker on the Apple GPU (float16). Docker is for "runs anywhere";
+for day-to-day use on a Mac, run the API directly.
+
+## D40. nginx serves the UI and forwards /api (Stage 7)
+
+**Decision:** The `web` image builds the React app and serves it with nginx, which forwards
+`/api/*` to the `api` service (same as the Vite proxy in development, D36). The API port is
+not published; only nginx is.
+**Why:** One origin, no CORS, and one public entry point. nginx also enforces
+`client_max_body_size 25m`, so oversized uploads are rejected before they reach Python. That
+closes the gap from D18 (verified: a 26 MB upload got 413 from nginx).
+
+## D41. Docker Compose details (Stage 7)
+
+**Decision:**
+- Two named volumes: `data` (index, uploads, job table) and `models` (Hugging Face cache, so
+  the 3 GB download happens once).
+- `web` waits for `api` to be healthy. The API health check allows 10 minutes for the first
+  model download.
+- The path settings are set in `environment:`, which Compose applies over `.env`, so values
+  copied from `.env.example` can't move data off the volumes.
+- The web port is `WEB_PORT` (default 8080).
+- The API runs as a non-root user.
+**Verified:** Built both images, ran the stack, uploaded, queried, restarted the API and saw
+the same 10 chunks, and checked the nginx upload limit.
+**Found while testing:** Port 8080 was taken by another local project, which is why the port
+is now configurable. And the first compose draft let `.env` override the data paths, which is
+why they're pinned now.
+
+## D42. CI: lint, tests without models, frontend build, image build (Stage 7)
+
+**Decision:** GitHub Actions runs three jobs on every push and pull request: backend (`ruff
+format --check`, `ruff check`, `pytest`), frontend (`oxlint`, strict type-check and build),
+and `docker compose build`.
+**Why no models in CI:** Every test uses the fake embedder, store and generator (D13), so
+nothing is downloaded. CI sets `HF_HUB_OFFLINE=1`, so if a test ever did try to load a real
+model it would fail instead of quietly downloading 3 GB. It installs CPU-only PyTorch because
+the generator module imports it.
+**Also:** `tests/test_config.py` checks that `.env.example` lists every setting, so the
+example config can't fall out of date.
