@@ -5,6 +5,7 @@ venv/
 .env
 chroma_db/
 uploads/
+jobs.sqlite3
 .ipynb_checkpoints/
 .DS_Store
 .pytest_cache/

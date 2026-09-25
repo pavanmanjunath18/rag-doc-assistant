@@ -1,4 +1,4 @@
-"""HTTP API: upload documents, ask questions, check health.
+"""HTTP API: upload documents, track ingestion jobs, ask questions, check health.
 
 Run with:  uvicorn --factory api.app:create_app
 """
@@ -11,13 +11,27 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response, UploadFile
 
-from api.schemas import DocumentResponse, HealthResponse, QueryRequest, QueryResponse, Source
-from api.uploads import UploadRejected, check_content, sanitize_filename, save_upload
+from api.schemas import (
+    HealthResponse,
+    JobAccepted,
+    JobResponse,
+    QueryRequest,
+    QueryResponse,
+    Source,
+)
+from api.uploads import (
+    UploadRejected,
+    check_content,
+    remove_stale_temp_files,
+    sanitize_filename,
+    save_upload,
+)
 from rag.config import Settings
 from rag.factory import build_pipeline
-from rag.loader import SUPPORTED_SUFFIXES, DocumentError
+from rag.jobs import RESTART_ERROR, IngestTask, IngestWorker, JobStore
+from rag.loader import SUPPORTED_SUFFIXES
 from rag.logs import configure_logging
-from rag.pipeline import IngestStatus, RagPipeline
+from rag.pipeline import RagPipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -31,8 +45,18 @@ def get_settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
+def get_jobs(request: Request) -> JobStore:
+    return request.app.state.jobs
+
+
+def get_worker(request: Request) -> IngestWorker:
+    return request.app.state.worker
+
+
 PipelineDep = Annotated[RagPipeline, Depends(get_pipeline)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+JobsDep = Annotated[JobStore, Depends(get_jobs)]
+WorkerDep = Annotated[IngestWorker, Depends(get_worker)]
 
 
 def create_app(settings: Settings | None = None, pipeline: RagPipeline | None = None) -> FastAPI:
@@ -47,10 +71,22 @@ def create_app(settings: Settings | None = None, pipeline: RagPipeline | None = 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.pipeline = pipeline or build_pipeline(settings)
+        app.state.jobs = JobStore(settings.jobs_db)
+        interrupted = app.state.jobs.fail_unfinished(RESTART_ERROR)
+        removed = remove_stale_temp_files(settings.upload_dir)
+        if interrupted or removed:
+            logger.warning(
+                "Previous run stopped mid-job: %d jobs marked failed, %d temp files removed",
+                interrupted,
+                removed,
+            )
+        app.state.worker = IngestWorker(app.state.pipeline, app.state.jobs)
+        app.state.worker.start()
         logger.info("Ready: %d chunks indexed", app.state.pipeline.chunk_count())
         yield
+        app.state.worker.stop()
 
-    app = FastAPI(title="RAG Document Assistant", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="RAG Document Assistant", version="0.4.0", lifespan=lifespan)
     app.state.settings = settings
     app.include_router(router)
     return app
@@ -66,13 +102,17 @@ def health(pipeline: PipelineDep) -> HealthResponse:
     return HealthResponse(status="ok", chunks_indexed=pipeline.chunk_count())
 
 
-@router.post("/documents", status_code=201)
+@router.post("/documents", status_code=202)
 def upload_document(
-    file: UploadFile, response: Response, pipeline: PipelineDep, settings: SettingsDep
-) -> DocumentResponse:
-    """Upload a PDF, .txt or .md file and index it.
+    file: UploadFile,
+    response: Response,
+    settings: SettingsDep,
+    jobs: JobsDep,
+    worker: WorkerDep,
+) -> JobAccepted:
+    """Upload a PDF, .txt or .md file. It is checked now and indexed in the background.
 
-    Returns 201 when something was indexed, 200 when identical content was already indexed.
+    Returns 202 with a job ID; poll `GET /jobs/{job_id}` for the result.
     """
     filename = sanitize_filename(file.filename or "")
     suffix = Path(filename).suffix.lower()
@@ -84,28 +124,28 @@ def upload_document(
         tmp = save_upload(file.file, settings.upload_dir, suffix, settings.max_upload_bytes)
     except UploadRejected as exc:
         raise HTTPException(exc.status_code, str(exc)) from exc
-
     try:
         check_content(tmp, suffix)
-        result = pipeline.ingest(tmp, source=filename)
-        if result.status is IngestStatus.UNCHANGED:
-            response.status_code = 200
-        else:
-            tmp.replace(settings.upload_dir / filename)
     except UploadRejected as exc:
-        raise HTTPException(exc.status_code, str(exc)) from exc
-    except DocumentError as exc:
-        raise HTTPException(422, str(exc)) from exc
-    finally:
         tmp.unlink(missing_ok=True)
+        raise HTTPException(exc.status_code, str(exc)) from exc
 
-    logger.info("Upload %s: %s (%d chunks)", filename, result.status, result.chunks)
-    return DocumentResponse(
-        document_id=result.doc_id,
-        filename=result.source,
-        chunks=result.chunks,
-        status=result.status,
+    job = jobs.create(filename)
+    worker.submit(
+        IngestTask(job_id=job.id, path=tmp, source=filename, keep_as=settings.upload_dir / filename)
     )
+    response.headers["Location"] = f"/jobs/{job.id}"
+    logger.info("Queued %s as job %s", filename, job.id)
+    return JobAccepted(job_id=job.id, filename=filename, status=job.status)
+
+
+@router.get("/jobs/{job_id}")
+def get_job(job_id: str, jobs: JobsDep) -> JobResponse:
+    """Return an ingestion job's status, its result when done, or its error if it failed."""
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, f"No job with id {job_id}")
+    return JobResponse.from_job(job)
 
 
 @router.post("/query")

@@ -11,6 +11,7 @@ _UNSAFE_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
 _READ_SIZE = 1024 * 1024
 _SNIFF_SIZE = 8192
 _PDF_MAGIC = b"%PDF-"
+_TEMP_PREFIX = ".upload-"
 
 
 class UploadRejected(Exception):
@@ -46,7 +47,7 @@ def save_upload(src: BinaryIO, directory: Path, suffix: str, max_bytes: int) -> 
     directory.mkdir(parents=True, exist_ok=True)
     total = 0
     with tempfile.NamedTemporaryFile(
-        dir=directory, prefix=".upload-", suffix=suffix, delete=False
+        dir=directory, prefix=_TEMP_PREFIX, suffix=suffix, delete=False
     ) as out:
         tmp = Path(out.name)
         try:
@@ -73,3 +74,13 @@ def check_content(path: Path, suffix: str) -> None:
         raise UploadRejected(415, "File is named .pdf but is not a PDF")
     if suffix in {".txt", ".md"} and b"\x00" in head:
         raise UploadRejected(415, "File is named as text but contains binary data")
+
+
+def remove_stale_temp_files(directory: Path) -> int:
+    """Delete temp uploads left behind by a server that stopped mid-job. Returns the count."""
+    if not directory.exists():
+        return 0
+    stale = list(directory.glob(f"{_TEMP_PREFIX}*"))
+    for path in stale:
+        path.unlink(missing_ok=True)
+    return len(stale)

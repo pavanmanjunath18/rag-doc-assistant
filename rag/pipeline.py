@@ -78,7 +78,7 @@ class RagPipeline:
             logger.info("Skipped %s: same content already indexed as %s", name, existing.source)
             return IngestResult(doc_id, existing.source, existing.chunks, IngestStatus.UNCHANGED)
 
-        chunks = chunk_text(load_text(path), self._chunk_size, self._chunk_overlap)
+        chunks = chunk_text(load_text(path, name), self._chunk_size, self._chunk_overlap)
         self._store.add(doc_id, name, chunks, self._embedder.embed(chunks))
         removed = self._store.delete_stale_versions(name, doc_id)
         status = IngestStatus.REPLACED if removed else IngestStatus.INDEXED

@@ -23,35 +23,35 @@ def document_id(path: str | Path) -> str:
         return hashlib.file_digest(f, "sha256").hexdigest()
 
 
-def load_text(path: str | Path) -> str:
+def load_text(path: str | Path, name: str | None = None) -> str:
     """Read a PDF or text file and return its text.
 
     Raises DocumentError for unsupported, unreadable or empty files, so a bad file fails
-    loudly instead of being indexed as nothing.
+    loudly instead of being indexed as nothing. `name` is used in messages instead of the
+    file's own name (uploads are read from temp files with meaningless names).
     """
     path = Path(path)
+    name = name or path.name
     suffix = path.suffix.lower()
     if suffix not in SUPPORTED_SUFFIXES:
-        raise DocumentError(f"Unsupported file type: {path.name}")
+        raise DocumentError(f"Unsupported file type: {name}")
 
     if suffix == ".pdf":
         try:
             pages = [page.extract_text() or "" for page in PdfReader(str(path)).pages]
         except PdfReadError as exc:
-            raise DocumentError(f"Could not read PDF {path.name}: {exc}") from exc
+            raise DocumentError(f"Could not read PDF {name}: {exc}") from exc
         empty = sum(1 for page in pages if not page.strip())
         if empty:
-            logger.warning(
-                "%s: %d of %d pages had no extractable text", path.name, empty, len(pages)
-            )
+            logger.warning("%s: %d of %d pages had no extractable text", name, empty, len(pages))
         text = "\n".join(pages)
     else:
         text = path.read_text(encoding="utf-8", errors="replace")
         if "\N{REPLACEMENT CHARACTER}" in text:
-            logger.warning("%s: some bytes were not valid UTF-8 and were replaced", path.name)
+            logger.warning("%s: some bytes were not valid UTF-8 and were replaced", name)
 
     if not text.strip():
-        raise DocumentError(f"No text extracted from {path.name}")
+        raise DocumentError(f"No text extracted from {name}")
     return text
 
 

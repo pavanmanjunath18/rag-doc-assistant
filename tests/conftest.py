@@ -15,7 +15,10 @@ from tests.fakes import FakeEmbedder, FakeGenerator, InMemoryStore
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return Settings(
-        chroma_dir=tmp_path / "chroma", upload_dir=tmp_path / "uploads", max_upload_mb=1
+        chroma_dir=tmp_path / "chroma",
+        upload_dir=tmp_path / "uploads",
+        jobs_db=tmp_path / "jobs.sqlite3",
+        max_upload_mb=1,
     )
 
 

@@ -24,6 +24,7 @@ class Settings:
     top_k: int = 3
     max_new_tokens: int = 200
     upload_dir: Path = Path("uploads")
+    jobs_db: Path = Path("jobs.sqlite3")
     max_upload_mb: int = 20
     log_level: str = "INFO"
 
@@ -46,6 +47,7 @@ class Settings:
             top_k=_int_env("TOP_K", d.top_k),
             max_new_tokens=_int_env("MAX_NEW_TOKENS", d.max_new_tokens),
             upload_dir=Path(os.getenv("UPLOAD_DIR", str(d.upload_dir))),
+            jobs_db=Path(os.getenv("JOBS_DB", str(d.jobs_db))),
             max_upload_mb=_int_env("MAX_UPLOAD_MB", d.max_upload_mb),
             log_level=os.getenv("LOG_LEVEL", d.log_level),
         )
