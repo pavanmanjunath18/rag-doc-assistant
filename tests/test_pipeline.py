@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from rag.pipeline import EMPTY_INDEX_ANSWER, RagPipeline
+from rag.pipeline import EMPTY_INDEX_ANSWER, IngestStatus, RagPipeline
 from tests.fakes import FakeGenerator, InMemoryStore
 
 DEBT = "INDEBTEDNESS\nNetflix had $14.5 billion of senior notes outstanding."
@@ -19,8 +19,9 @@ def write(tmp_path: Path, name: str, text: str) -> Path:
 def test_ingest_stores_chunks_under_the_source_name(
     tmp_path: Path, pipeline: RagPipeline, store: InMemoryStore
 ) -> None:
-    assert pipeline.ingest(write(tmp_path, "tmp123.txt", DEBT), source="risk.txt") == 1
-    assert [row[0] for row in store.rows.values()] == ["risk.txt"]
+    result = pipeline.ingest(write(tmp_path, "tmp123.txt", DEBT), source="risk.txt")
+    assert (result.source, result.chunks, result.status) == ("risk.txt", 1, IngestStatus.INDEXED)
+    assert [row.source for row in store.rows.values()] == ["risk.txt"]
     assert pipeline.chunk_count() == 1
 
 

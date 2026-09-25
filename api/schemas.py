@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from rag.pipeline import IngestStatus
+
 
 class HealthResponse(BaseModel):
     status: Literal["ok"]
@@ -11,8 +13,13 @@ class HealthResponse(BaseModel):
 
 
 class DocumentResponse(BaseModel):
-    filename: str = Field(description="Sanitized name the document is stored and cited under")
-    chunks: int = Field(description="Number of chunks indexed")
+    document_id: str = Field(description="SHA-256 of the file's bytes")
+    filename: str = Field(description="Name the document is cited under")
+    chunks: int = Field(description="Number of chunks stored for this document")
+    status: IngestStatus = Field(
+        description="indexed (new), replaced (new version of a same-named file) or "
+        "unchanged (identical content was already indexed)"
+    )
 
 
 class QueryRequest(BaseModel):

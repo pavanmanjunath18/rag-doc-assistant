@@ -1,5 +1,6 @@
 """API tests: real FastAPI app and pipeline, with fake models and an in-memory store."""
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -8,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from rag.config import Settings
 from rag.pipeline import EMPTY_INDEX_ANSWER
-from tests.fakes import FakeGenerator
+from tests.fakes import FakeEmbedder, FakeGenerator
 
 DEBT = b"INDEBTEDNESS\nNetflix had $14.5 billion of senior notes outstanding."
 REVENUE = b"REVENUES\nTotal revenues were $45.2 billion, up 16 percent."
@@ -39,9 +40,41 @@ def test_health_reports_indexed_chunks(client: TestClient) -> None:
 def test_upload_indexes_and_saves_the_file(client: TestClient, settings: Settings) -> None:
     response = upload(client, "debt.txt", DEBT)
     assert response.status_code == 201
-    assert response.json() == {"filename": "debt.txt", "chunks": 1}
+    assert response.json() == {
+        "document_id": hashlib.sha256(DEBT).hexdigest(),
+        "filename": "debt.txt",
+        "chunks": 1,
+        "status": "indexed",
+    }
     assert (settings.upload_dir / "debt.txt").read_bytes() == DEBT
     assert leftover_files(settings) == ["debt.txt"]
+
+
+def test_uploading_the_same_file_again_is_a_no_op(
+    client: TestClient, settings: Settings, embedder: FakeEmbedder
+) -> None:
+    first = upload(client, "debt.txt", DEBT).json()
+    embedded = embedder.texts_embedded
+
+    response = upload(client, "debt.txt", DEBT)
+
+    assert response.status_code == 200
+    assert response.json() == {**first, "status": "unchanged"}
+    assert embedder.texts_embedded == embedded
+    assert client.get("/health").json()["chunks_indexed"] == 1
+    assert leftover_files(settings) == ["debt.txt"]
+
+
+def test_uploading_a_changed_file_replaces_it(client: TestClient, settings: Settings) -> None:
+    upload(client, "report.txt", DEBT)
+    response = upload(client, "report.txt", REVENUE)
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "replaced"
+    assert client.get("/health").json()["chunks_indexed"] == 1
+    sources = client.post("/query", json={"question": "senior notes revenues"}).json()["sources"]
+    assert [s["text"] for s in sources] == [REVENUE.decode()]
+    assert (settings.upload_dir / "report.txt").read_bytes() == REVENUE
 
 
 def test_minimal_pdf_is_accepted_past_validation(client: TestClient) -> None:

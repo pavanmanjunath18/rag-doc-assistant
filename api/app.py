@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response, UploadFile
 
 from api.schemas import DocumentResponse, HealthResponse, QueryRequest, QueryResponse, Source
 from api.uploads import UploadRejected, check_content, sanitize_filename, save_upload
@@ -17,7 +17,7 @@ from rag.config import Settings
 from rag.factory import build_pipeline
 from rag.loader import SUPPORTED_SUFFIXES, DocumentError
 from rag.logs import configure_logging
-from rag.pipeline import RagPipeline
+from rag.pipeline import IngestStatus, RagPipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -68,9 +68,12 @@ def health(pipeline: PipelineDep) -> HealthResponse:
 
 @router.post("/documents", status_code=201)
 def upload_document(
-    file: UploadFile, pipeline: PipelineDep, settings: SettingsDep
+    file: UploadFile, response: Response, pipeline: PipelineDep, settings: SettingsDep
 ) -> DocumentResponse:
-    """Upload a PDF, .txt or .md file and index it."""
+    """Upload a PDF, .txt or .md file and index it.
+
+    Returns 201 when something was indexed, 200 when identical content was already indexed.
+    """
     filename = sanitize_filename(file.filename or "")
     suffix = Path(filename).suffix.lower()
     if suffix not in SUPPORTED_SUFFIXES:
@@ -84,8 +87,11 @@ def upload_document(
 
     try:
         check_content(tmp, suffix)
-        chunks = pipeline.ingest(tmp, source=filename)
-        tmp.replace(settings.upload_dir / filename)
+        result = pipeline.ingest(tmp, source=filename)
+        if result.status is IngestStatus.UNCHANGED:
+            response.status_code = 200
+        else:
+            tmp.replace(settings.upload_dir / filename)
     except UploadRejected as exc:
         raise HTTPException(exc.status_code, str(exc)) from exc
     except DocumentError as exc:
@@ -93,8 +99,13 @@ def upload_document(
     finally:
         tmp.unlink(missing_ok=True)
 
-    logger.info("Uploaded %s (%d chunks)", filename, chunks)
-    return DocumentResponse(filename=filename, chunks=chunks)
+    logger.info("Upload %s: %s (%d chunks)", filename, result.status, result.chunks)
+    return DocumentResponse(
+        document_id=result.doc_id,
+        filename=result.source,
+        chunks=result.chunks,
+        status=result.status,
+    )
 
 
 @router.post("/query")

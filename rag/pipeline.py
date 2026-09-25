@@ -2,15 +2,30 @@
 
 import logging
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 
 from rag.interfaces import Embedder, Generator, Hit, VectorStore
-from rag.loader import chunk_text, load_text
+from rag.loader import chunk_text, document_id, load_text
 from rag.prompts import build_baseline_messages, build_rag_messages
 
 logger = logging.getLogger(__name__)
 
 EMPTY_INDEX_ANSWER = "No documents indexed yet."
+
+
+class IngestStatus(StrEnum):
+    INDEXED = "indexed"  # new document
+    REPLACED = "replaced"  # new version of a document with the same name; old chunks removed
+    UNCHANGED = "unchanged"  # these exact bytes were already indexed; nothing was done
+
+
+@dataclass(frozen=True)
+class IngestResult:
+    doc_id: str
+    source: str
+    chunks: int
+    status: IngestStatus
 
 
 @dataclass(frozen=True)
@@ -45,16 +60,30 @@ class RagPipeline:
         self._chunk_overlap = chunk_overlap
         self._top_k = top_k
 
-    def ingest(self, path: Path, source: str | None = None) -> int:
-        """Load, chunk, embed and store one file. Returns the number of chunks stored.
+    def ingest(self, path: Path, source: str | None = None) -> IngestResult:
+        """Index one file, idempotently.
+
+        The document ID is a hash of the file's bytes. If those bytes are already indexed
+        (under any name), nothing is done. Otherwise the new version is stored first, and
+        only then are older versions with the same name deleted, so a failure part-way
+        leaves the previous version searchable.
 
         `source` is the name shown in citations; it defaults to the file name.
         """
         name = source or path.name
+        doc_id = document_id(path)
+
+        existing = self._store.find(doc_id)
+        if existing is not None:
+            logger.info("Skipped %s: same content already indexed as %s", name, existing.source)
+            return IngestResult(doc_id, existing.source, existing.chunks, IngestStatus.UNCHANGED)
+
         chunks = chunk_text(load_text(path), self._chunk_size, self._chunk_overlap)
-        self._store.add(name, chunks, self._embedder.embed(chunks))
-        logger.info("Indexed %d chunks from %s", len(chunks), name)
-        return len(chunks)
+        self._store.add(doc_id, name, chunks, self._embedder.embed(chunks))
+        removed = self._store.delete_stale_versions(name, doc_id)
+        status = IngestStatus.REPLACED if removed else IngestStatus.INDEXED
+        logger.info("Indexed %d chunks from %s (%s)", len(chunks), name, status)
+        return IngestResult(doc_id, name, len(chunks), status)
 
     def ask(self, question: str, use_rag: bool = True, top_k: int | None = None) -> Answer:
         """Answer a question with retrieval (default), or as the no-retrieval baseline."""

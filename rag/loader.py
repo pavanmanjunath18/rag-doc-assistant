@@ -1,5 +1,6 @@
 """Load documents (PDF or text) and split them into overlapping chunks."""
 
+import hashlib
 import logging
 from pathlib import Path
 
@@ -14,6 +15,12 @@ _WHITESPACE = (" ", "\n", "\t", "\r")
 
 class DocumentError(ValueError):
     """A document can't be used: unsupported type, unreadable, or no extractable text."""
+
+
+def document_id(path: str | Path) -> str:
+    """Return the SHA-256 of the file's bytes: the same content always gets the same ID."""
+    with Path(path).open("rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
 
 
 def load_text(path: str | Path) -> str:

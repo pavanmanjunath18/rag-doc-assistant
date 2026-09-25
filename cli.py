@@ -40,7 +40,8 @@ def main() -> None:
         else:
             files = [path]
         for f in files:
-            print(f"Indexed {pipeline.ingest(f)} chunks from {f.name}")
+            ingested = pipeline.ingest(f)
+            print(f"{ingested.status}: {ingested.source} ({ingested.chunks} chunks)")
     else:
         result = pipeline.ask(args.question, use_rag=not args.no_rag)
         print("\n" + result.text)

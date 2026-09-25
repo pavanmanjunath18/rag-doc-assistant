@@ -25,14 +25,21 @@ def store() -> InMemoryStore:
 
 
 @pytest.fixture
+def embedder() -> FakeEmbedder:
+    return FakeEmbedder()
+
+
+@pytest.fixture
 def generator() -> FakeGenerator:
     return FakeGenerator()
 
 
 @pytest.fixture
-def pipeline(settings: Settings, store: InMemoryStore, generator: FakeGenerator) -> RagPipeline:
+def pipeline(
+    settings: Settings, embedder: FakeEmbedder, store: InMemoryStore, generator: FakeGenerator
+) -> RagPipeline:
     return RagPipeline(
-        FakeEmbedder(),
+        embedder,
         store,
         generator,
         chunk_size=settings.chunk_size,
