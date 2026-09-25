@@ -36,7 +36,8 @@ class HuggingFaceGenerator:
         self._max_new_tokens = max_new_tokens
         # One model instance serves every request, so run one generation at a time.
         self._lock = threading.Lock()
-        logger.info("Loaded %s on %s (%s)", model_name, self._model.device, dtype)
+        self.description = f"{model_name} on {self._model.device} ({dtype})"
+        logger.info("Loaded %s", self.description)
         if device == "cpu":
             logger.warning("No GPU found: generation will be much slower than on a GPU")
 

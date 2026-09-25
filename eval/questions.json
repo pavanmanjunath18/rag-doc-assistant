@@ -1,0 +1,266 @@
+{
+  "about": "Evaluation questions over data/corpus. 'benchmark' = the 8 questions from the proof notebook. 'held_out' = questions written in Stage 5 that were NOT used when choosing the prompt or guardrail wording. Grading: an answer is correct if it contains at least one alternative from every key_facts group and none of the forbidden strings (for the debt questions these include summing language such as '+ $', so an answer cut off mid-sum still counts as wrong); partial if it matches some groups; refusal_expected means only a refusal is correct; refusal_ok means a refusal also counts as correct. Matching is case-insensitive on normalized text. 'evidence' is a verbatim substring of the expected source file, used for retrieval hit@k.",
+  "questions": [
+    {
+      "id": "debt",
+      "set": "benchmark",
+      "question": "How much debt does Netflix have?",
+      "expected_source": "02_risk_factors.txt",
+      "evidence": "$14.5 billion aggregate principal amount of senior notes",
+      "key_facts": [
+        [
+          "14.5 billion",
+          "$14.5b"
+        ]
+      ],
+      "forbidden": [
+        "17.5",
+        "adding these",
+        "added together",
+        "sum of",
+        "+ $",
+        "+ \\$"
+      ],
+      "note": "The $3B revolver is undrawn, so adding it to the notes (the notebook's $17.5B) is wrong. Summing language counts as wrong even if the answer is cut off before the total."
+    },
+    {
+      "id": "revenue",
+      "set": "benchmark",
+      "question": "What was Netflix's total revenue in 2025?",
+      "expected_source": "05_financial_results.txt",
+      "evidence": "Total revenues: $45,183,036 thousand ($45.2 billion)",
+      "key_facts": [
+        [
+          "45.2 billion",
+          "45,183,036"
+        ]
+      ]
+    },
+    {
+      "id": "dividends",
+      "set": "benchmark",
+      "question": "Does Netflix pay dividends?",
+      "expected_source": "04_stock_and_equity.txt",
+      "evidence": "has never declared or paid any cash dividends",
+      "key_facts": [
+        [
+          "never",
+          "does not pay",
+          "doesn't pay",
+          "not pay"
+        ]
+      ]
+    },
+    {
+      "id": "employees",
+      "set": "benchmark",
+      "question": "How many employees does Netflix have?",
+      "expected_source": "01_business.txt",
+      "evidence": "approximately 16,000 full-time employees",
+      "key_facts": [
+        [
+          "16,000"
+        ]
+      ]
+    },
+    {
+      "id": "cybersecurity",
+      "set": "benchmark",
+      "question": "Who oversees cybersecurity risk at Netflix?",
+      "expected_source": "03_cybersecurity.txt",
+      "evidence": "The Audit Committee of the Board oversees cybersecurity risk",
+      "key_facts": [
+        [
+          "audit committee"
+        ]
+      ],
+      "note": "The Senior Director leads the security program; the Audit Committee oversees the risk."
+    },
+    {
+      "id": "stock_split",
+      "set": "benchmark",
+      "question": "What happened with the Netflix stock split?",
+      "expected_source": "04_stock_and_equity.txt",
+      "evidence": "ten-for-one forward stock split",
+      "key_facts": [
+        [
+          "ten-for-one",
+          "10-for-1",
+          "10 for 1",
+          "ten for one"
+        ]
+      ]
+    },
+    {
+      "id": "wbd_fee",
+      "set": "benchmark",
+      "question": "What is the WBD transaction termination fee?",
+      "expected_source": "02_risk_factors.txt",
+      "evidence": "$5.8 billion termination fee",
+      "key_facts": [
+        [
+          "5.8 billion"
+        ]
+      ]
+    },
+    {
+      "id": "operating_margin",
+      "set": "benchmark",
+      "question": "What is Netflix's operating margin?",
+      "expected_source": "05_financial_results.txt",
+      "evidence": "Operating margin: 29.5% in 2025",
+      "key_facts": [
+        [
+          "29.5"
+        ]
+      ],
+      "note": "\"Up about three points\" is true but doesn't answer the question."
+    },
+    {
+      "id": "revolver",
+      "set": "held_out",
+      "question": "How much can Netflix borrow under its revolving credit facility, and how much has it borrowed?",
+      "expected_source": "02_risk_factors.txt",
+      "evidence": "$3 billion unsecured revolving credit facility",
+      "key_facts": [
+        [
+          "3 billion"
+        ],
+        [
+          "no amounts",
+          "not borrowed",
+          "no borrow",
+          "none",
+          "nothing",
+          "$0",
+          "zero",
+          "not been borrowed",
+          "no money"
+        ]
+      ],
+      "forbidden": [
+        "17.5"
+      ]
+    },
+    {
+      "id": "total_debt_trap",
+      "set": "held_out",
+      "question": "What is Netflix's total debt, including the financing for the WBD transaction?",
+      "expected_source": "02_risk_factors.txt",
+      "evidence": "$42.2 billion senior unsecured bridge term loan facility",
+      "key_facts": [
+        [
+          "14.5 billion"
+        ]
+      ],
+      "forbidden": [
+        "17.5",
+        "20.2",
+        "23.2",
+        "34.5",
+        "56.7",
+        "59.7",
+        "62.2",
+        "67.2",
+        "76.7",
+        "81.7",
+        "84.7",
+        "adding these",
+        "added together",
+        "sum of",
+        "+ $",
+        "+ \\$"
+      ],
+      "refusal_ok": true,
+      "note": "No total is stated and the WBD facilities are commitments, not borrowings. Any computed sum, or starting to add figures up, is wrong; quoting the components or declining both count."
+    },
+    {
+      "id": "tech_spend",
+      "set": "held_out",
+      "question": "How much did Netflix spend on technology and development in 2025?",
+      "expected_source": "05_financial_results.txt",
+      "evidence": "Technology and development expenses for 2025: $3,391,390 thousand ($3.4 billion)",
+      "key_facts": [
+        [
+          "3.4 billion",
+          "3,391,390"
+        ]
+      ]
+    },
+    {
+      "id": "ucan_revenue",
+      "set": "held_out",
+      "question": "What were Netflix's streaming revenues in the United States and Canada in 2025?",
+      "expected_source": "05_financial_results.txt",
+      "evidence": "United States and Canada (UCAN): $19,957,152 thousand ($20.0 billion)",
+      "key_facts": [
+        [
+          "20.0 billion",
+          "19,957,152",
+          "20 billion"
+        ]
+      ]
+    },
+    {
+      "id": "wga_expiry",
+      "set": "held_out",
+      "question": "When does the Writers Guild of America agreement expire?",
+      "expected_source": "02_risk_factors.txt",
+      "evidence": "Writers Guild of America (WGA) agreement expiring on May 1, 2026",
+      "key_facts": [
+        [
+          "may 1, 2026"
+        ]
+      ]
+    },
+    {
+      "id": "q4_buyback",
+      "set": "held_out",
+      "question": "How many shares did Netflix repurchase in the fourth quarter of 2025?",
+      "expected_source": "04_stock_and_equity.txt",
+      "evidence": "Total for the quarter: 18,882,245 shares purchased",
+      "key_facts": [
+        [
+          "18,882,245"
+        ]
+      ]
+    },
+    {
+      "id": "interest_expense",
+      "set": "held_out",
+      "question": "What was Netflix's interest expense in 2025?",
+      "expected_source": "05_financial_results.txt",
+      "evidence": "Interest expense for 2025 was $776,510 thousand ($777 million)",
+      "key_facts": [
+        [
+          "777 million",
+          "776,510"
+        ]
+      ]
+    },
+    {
+      "id": "ucan_staff_share",
+      "set": "held_out",
+      "question": "What share of Netflix's employees work in the United States and Canada?",
+      "expected_source": "01_business.txt",
+      "evidence": "10,900 (68%) were located in the United States and Canada",
+      "key_facts": [
+        [
+          "68%",
+          "68 percent",
+          "10,900"
+        ]
+      ]
+    },
+    {
+      "id": "free_cash_flow",
+      "set": "held_out",
+      "question": "What was Netflix's free cash flow in 2025?",
+      "expected_source": null,
+      "evidence": null,
+      "key_facts": [],
+      "refusal_expected": true,
+      "note": "Not in the corpus. The only correct answer is to say the documents don't contain it."
+    }
+  ]
+}

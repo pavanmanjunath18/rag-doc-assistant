@@ -85,13 +85,17 @@ class RagPipeline:
         logger.info("Indexed %d chunks from %s (%s)", len(chunks), name, status)
         return IngestResult(doc_id, name, len(chunks), status)
 
+    def retrieve(self, question: str, top_k: int | None = None) -> list[Hit]:
+        """Return the chunks most relevant to `question`, best first."""
+        [query_vector] = self._embedder.embed([question])
+        return self._store.search(query_vector, top_k or self._top_k)
+
     def ask(self, question: str, use_rag: bool = True, top_k: int | None = None) -> Answer:
         """Answer a question with retrieval (default), or as the no-retrieval baseline."""
         if not use_rag:
             return Answer(text=self._generator.generate(build_baseline_messages(question)))
 
-        [query_vector] = self._embedder.embed([question])
-        hits = self._store.search(query_vector, top_k or self._top_k)
+        hits = self.retrieve(question, top_k)
         if not hits:
             return Answer(text=EMPTY_INDEX_ANSWER)
 
