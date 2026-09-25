@@ -1,23 +1,20 @@
-"""Embedding model wrapper. Loaded once and reused."""
+"""Embedding model backed by sentence-transformers (runs locally)."""
 
 import logging
-from functools import lru_cache
 
 from sentence_transformers import SentenceTransformer
-
-from rag.config import EMBED_MODEL
 
 logger = logging.getLogger(__name__)
 
 
-@lru_cache(maxsize=1)
-def get_embedder() -> SentenceTransformer:
-    """Load the embedding model on first use and reuse it afterwards."""
-    logger.info("Loading embedding model %s", EMBED_MODEL)
-    return SentenceTransformer(EMBED_MODEL)
+class SentenceTransformerEmbedder:
+    """Embedder that loads a sentence-transformers model once, when constructed."""
 
+    def __init__(self, model_name: str) -> None:
+        logger.info("Loading embedding model %s", model_name)
+        self._model = SentenceTransformer(model_name)
 
-def embed(texts: list[str]) -> list[list[float]]:
-    """Embed texts as unit-length vectors, so cosine similarity is a plain dot product."""
-    vectors = get_embedder().encode(texts, normalize_embeddings=True, show_progress_bar=False)
-    return vectors.tolist()
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        """Embed texts as unit-length vectors, so cosine similarity is a plain dot product."""
+        vectors = self._model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+        return vectors.tolist()

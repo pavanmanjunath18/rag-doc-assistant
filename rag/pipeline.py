@@ -1,13 +1,14 @@
-"""High-level ingest and ask functions used by the CLI (and later the API)."""
+"""Ingest documents and answer questions about them. Used by the CLI and the API."""
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from rag.config import TOP_K
-from rag.generator import generate
+from rag.interfaces import Embedder, Generator, Hit, VectorStore
 from rag.loader import chunk_text, load_text
 from rag.prompts import build_baseline_messages, build_rag_messages
-from rag.store import Hit, add_chunks, search
+
+logger = logging.getLogger(__name__)
 
 EMPTY_INDEX_ANSWER = "No documents indexed yet."
 
@@ -20,20 +21,54 @@ class Answer:
     sources: list[Hit] = field(default_factory=list)
 
 
-def ingest(path: str | Path) -> int:
-    """Load, chunk, embed and store one file. Returns the number of chunks stored."""
-    path = Path(path)
-    return add_chunks(chunk_text(load_text(path)), source=path.name)
+class RagPipeline:
+    """Retrieval-augmented Q&A over stored documents.
 
+    The embedder, store and generator are passed in rather than created here, so tests can
+    use fakes and other providers can be swapped in without changing this class.
+    """
 
-def ask(question: str, use_rag: bool = True, top_k: int = TOP_K) -> Answer:
-    """Answer a question with retrieval (default), or as the no-retrieval baseline."""
-    if not use_rag:
-        return Answer(text=generate(build_baseline_messages(question)))
+    def __init__(
+        self,
+        embedder: Embedder,
+        store: VectorStore,
+        generator: Generator,
+        *,
+        chunk_size: int,
+        chunk_overlap: int,
+        top_k: int,
+    ) -> None:
+        self._embedder = embedder
+        self._store = store
+        self._generator = generator
+        self._chunk_size = chunk_size
+        self._chunk_overlap = chunk_overlap
+        self._top_k = top_k
 
-    hits = search(question, top_k)
-    if not hits:
-        return Answer(text=EMPTY_INDEX_ANSWER)
+    def ingest(self, path: Path, source: str | None = None) -> int:
+        """Load, chunk, embed and store one file. Returns the number of chunks stored.
 
-    answer = generate(build_rag_messages(question, [hit.text for hit in hits]))
-    return Answer(text=answer, sources=hits)
+        `source` is the name shown in citations; it defaults to the file name.
+        """
+        name = source or path.name
+        chunks = chunk_text(load_text(path), self._chunk_size, self._chunk_overlap)
+        self._store.add(name, chunks, self._embedder.embed(chunks))
+        logger.info("Indexed %d chunks from %s", len(chunks), name)
+        return len(chunks)
+
+    def ask(self, question: str, use_rag: bool = True, top_k: int | None = None) -> Answer:
+        """Answer a question with retrieval (default), or as the no-retrieval baseline."""
+        if not use_rag:
+            return Answer(text=self._generator.generate(build_baseline_messages(question)))
+
+        [query_vector] = self._embedder.embed([question])
+        hits = self._store.search(query_vector, top_k or self._top_k)
+        if not hits:
+            return Answer(text=EMPTY_INDEX_ANSWER)
+
+        messages = build_rag_messages(question, [hit.text for hit in hits])
+        return Answer(text=self._generator.generate(messages), sources=hits)
+
+    def chunk_count(self) -> int:
+        """Return how many chunks are indexed."""
+        return self._store.count()

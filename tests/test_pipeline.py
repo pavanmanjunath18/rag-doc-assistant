@@ -1,65 +1,64 @@
-"""Tests for the ask() flow with retrieval and generation replaced by fakes (no models loaded)."""
+"""Tests for RagPipeline using fake components (no models loaded)."""
 
-import pytest
+from pathlib import Path
 
-from rag import pipeline
-from rag.prompts import Message
-from rag.store import Hit
+from rag.pipeline import EMPTY_INDEX_ANSWER, RagPipeline
+from tests.fakes import FakeGenerator, InMemoryStore
 
-HITS = [
-    Hit(text="senior notes $14.5 billion", source="02_risk_factors.txt", chunk=7, score=0.61),
-    Hit(text="revenues $45.2 billion", source="05_financial_results.txt", chunk=0, score=0.40),
-    Hit(text="interest on senior notes", source="05_financial_results.txt", chunk=5, score=0.38),
-]
+DEBT = "INDEBTEDNESS\nNetflix had $14.5 billion of senior notes outstanding."
+REVENUE = "REVENUES\nTotal revenues were $45.2 billion, up 16 percent."
+DIVIDENDS = "DIVIDEND POLICY\nNetflix has never paid cash dividends on its stock."
 
 
-@pytest.fixture
-def seen_messages(monkeypatch: pytest.MonkeyPatch) -> list[list[Message]]:
-    calls: list[list[Message]] = []
-
-    def fake_generate(messages: list[Message]) -> str:
-        calls.append(messages)
-        return "fake answer"
-
-    monkeypatch.setattr(pipeline, "generate", fake_generate)
-    return calls
+def write(tmp_path: Path, name: str, text: str) -> Path:
+    path = tmp_path / name
+    path.write_text(text, encoding="utf-8")
+    return path
 
 
-def test_sources_keep_rank_order_and_duplicates(
-    monkeypatch: pytest.MonkeyPatch, seen_messages: list[list[Message]]
+def test_ingest_stores_chunks_under_the_source_name(
+    tmp_path: Path, pipeline: RagPipeline, store: InMemoryStore
 ) -> None:
-    monkeypatch.setattr(pipeline, "search", lambda question, top_k: HITS)
-    answer = pipeline.ask("How much debt does Netflix have?")
-    assert answer.text == "fake answer"
-    assert answer.sources == HITS
+    assert pipeline.ingest(write(tmp_path, "tmp123.txt", DEBT), source="risk.txt") == 1
+    assert [row[0] for row in store.rows.values()] == ["risk.txt"]
+    assert pipeline.chunk_count() == 1
 
 
-def test_retrieved_text_reaches_the_prompt_in_order(
-    monkeypatch: pytest.MonkeyPatch, seen_messages: list[list[Message]]
+def test_most_relevant_chunk_is_first_and_reaches_the_prompt_in_order(
+    tmp_path: Path, pipeline: RagPipeline, generator: FakeGenerator
 ) -> None:
-    monkeypatch.setattr(pipeline, "search", lambda question, top_k: HITS)
-    pipeline.ask("How much debt does Netflix have?")
-    prompt = seen_messages[0][0]["content"]
-    positions = [prompt.index(hit.text) for hit in HITS]
+    for name, text in [("revenue.txt", REVENUE), ("debt.txt", DEBT), ("div.txt", DIVIDENDS)]:
+        pipeline.ingest(write(tmp_path, name, text))
+
+    answer = pipeline.ask("How much in senior notes did Netflix have outstanding?")
+
+    assert answer.text == FakeGenerator.answer
+    assert answer.sources[0].source == "debt.txt"
+    assert [hit.score for hit in answer.sources] == sorted(
+        (hit.score for hit in answer.sources), reverse=True
+    )
+    prompt = generator.calls[0][0]["content"]
+    positions = [prompt.index(hit.text) for hit in answer.sources]
     assert positions == sorted(positions)
 
 
-def test_baseline_skips_retrieval(
-    monkeypatch: pytest.MonkeyPatch, seen_messages: list[list[Message]]
-) -> None:
-    def fail_search(question: str, top_k: int) -> list[Hit]:
-        raise AssertionError("baseline must not search")
+def test_top_k_limits_sources(tmp_path: Path, pipeline: RagPipeline) -> None:
+    for name, text in [("revenue.txt", REVENUE), ("debt.txt", DEBT), ("div.txt", DIVIDENDS)]:
+        pipeline.ingest(write(tmp_path, name, text))
+    assert len(pipeline.ask("Netflix", top_k=1).sources) == 1
 
-    monkeypatch.setattr(pipeline, "search", fail_search)
+
+def test_baseline_skips_retrieval(
+    pipeline: RagPipeline, store: InMemoryStore, generator: FakeGenerator
+) -> None:
     answer = pipeline.ask("What is X?", use_rag=False)
     assert answer.sources == []
-    assert seen_messages == [[{"role": "user", "content": "What is X?"}]]
+    assert store.searches == 0
+    assert generator.calls == [[{"role": "user", "content": "What is X?"}]]
 
 
 def test_empty_index_does_not_call_the_model(
-    monkeypatch: pytest.MonkeyPatch, seen_messages: list[list[Message]]
+    pipeline: RagPipeline, generator: FakeGenerator
 ) -> None:
-    monkeypatch.setattr(pipeline, "search", lambda question, top_k: [])
-    answer = pipeline.ask("Anything?")
-    assert answer.text == pipeline.EMPTY_INDEX_ANSWER
-    assert seen_messages == []
+    assert pipeline.ask("Anything?").text == EMPTY_INDEX_ANSWER
+    assert generator.calls == []

@@ -4,8 +4,7 @@ import logging
 from pathlib import Path
 
 from pypdf import PdfReader
-
-from rag.config import CHUNK_OVERLAP, CHUNK_SIZE
+from pypdf.errors import PdfReadError
 
 logger = logging.getLogger(__name__)
 
@@ -13,19 +12,26 @@ SUPPORTED_SUFFIXES: frozenset[str] = frozenset({".pdf", ".txt", ".md"})
 _WHITESPACE = (" ", "\n", "\t", "\r")
 
 
+class DocumentError(ValueError):
+    """A document can't be used: unsupported type, unreadable, or no extractable text."""
+
+
 def load_text(path: str | Path) -> str:
     """Read a PDF or text file and return its text.
 
-    Raises ValueError for unsupported file types or when no text can be extracted,
-    so an unreadable file fails loudly instead of being indexed as nothing.
+    Raises DocumentError for unsupported, unreadable or empty files, so a bad file fails
+    loudly instead of being indexed as nothing.
     """
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix not in SUPPORTED_SUFFIXES:
-        raise ValueError(f"Unsupported file type: {path.name}")
+        raise DocumentError(f"Unsupported file type: {path.name}")
 
     if suffix == ".pdf":
-        pages = [page.extract_text() or "" for page in PdfReader(str(path)).pages]
+        try:
+            pages = [page.extract_text() or "" for page in PdfReader(str(path)).pages]
+        except PdfReadError as exc:
+            raise DocumentError(f"Could not read PDF {path.name}: {exc}") from exc
         empty = sum(1 for page in pages if not page.strip())
         if empty:
             logger.warning(
@@ -38,11 +44,11 @@ def load_text(path: str | Path) -> str:
             logger.warning("%s: some bytes were not valid UTF-8 and were replaced", path.name)
 
     if not text.strip():
-        raise ValueError(f"No text extracted from {path.name}")
+        raise DocumentError(f"No text extracted from {path.name}")
     return text
 
 
-def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+def chunk_text(text: str, size: int, overlap: int) -> list[str]:
     """Split text into chunks of at most `size` characters, overlapping by about `overlap`.
 
     Chunk edges are moved to whitespace so words and figures like "$45,183,036"

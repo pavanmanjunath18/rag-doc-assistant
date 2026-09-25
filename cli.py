@@ -7,20 +7,16 @@ Usage:
 """
 
 import argparse
-import logging
 from pathlib import Path
 
-from rag.config import LOG_LEVEL
+from rag.config import Settings
+from rag.factory import build_pipeline
 from rag.loader import SUPPORTED_SUFFIXES
-from rag.pipeline import ask, ingest
+from rag.logs import configure_logging
 
 
 def main() -> None:
     """Parse arguments and run the ingest or ask command."""
-    # Third-party libraries only show warnings; our own "rag.*" loggers follow LOG_LEVEL.
-    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
-    logging.getLogger("rag").setLevel(LOG_LEVEL)
-
     parser = argparse.ArgumentParser(description="RAG document assistant")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -33,6 +29,10 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    settings = Settings.from_env()
+    configure_logging(settings.log_level)
+    pipeline = build_pipeline(settings)
+
     if args.cmd == "ingest":
         path: Path = args.path
         if path.is_dir():
@@ -40,9 +40,9 @@ def main() -> None:
         else:
             files = [path]
         for f in files:
-            print(f"Indexed {ingest(f)} chunks from {f.name}")
+            print(f"Indexed {pipeline.ingest(f)} chunks from {f.name}")
     else:
-        result = ask(args.question, use_rag=not args.no_rag)
+        result = pipeline.ask(args.question, use_rag=not args.no_rag)
         print("\n" + result.text)
         if result.sources:
             print("\nSources:")

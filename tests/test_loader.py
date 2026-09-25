@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from rag.loader import chunk_text, load_text
+from rag.loader import DocumentError, chunk_text, load_text
 
 
 def numbered_words(n: int) -> str:
@@ -88,12 +88,19 @@ def test_load_text_replaces_invalid_bytes_and_warns(
 def test_load_text_rejects_empty_file(tmp_path: Path) -> None:
     doc = tmp_path / "blank.txt"
     doc.write_text("  \n ", encoding="utf-8")
-    with pytest.raises(ValueError, match="No text extracted"):
+    with pytest.raises(DocumentError, match="No text extracted"):
         load_text(doc)
 
 
 def test_load_text_rejects_unsupported_type(tmp_path: Path) -> None:
     doc = tmp_path / "sheet.xlsx"
     doc.write_bytes(b"not really a spreadsheet")
-    with pytest.raises(ValueError, match="Unsupported file type"):
+    with pytest.raises(DocumentError, match="Unsupported file type"):
+        load_text(doc)
+
+
+def test_load_text_wraps_corrupt_pdf_errors(tmp_path: Path) -> None:
+    doc = tmp_path / "broken.pdf"
+    doc.write_bytes(b"%PDF-1.4 but then garbage with no structure")
+    with pytest.raises(DocumentError, match="Could not read PDF broken.pdf"):
         load_text(doc)

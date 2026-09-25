@@ -1,17 +1,11 @@
 """Small local LLM for answer generation (no API key needed)."""
 
 import logging
-from functools import lru_cache
+import threading
 
 import torch
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    PreTrainedModel,
-    PreTrainedTokenizerBase,
-)
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from rag.config import GEN_MODEL, MAX_NEW_TOKENS
 from rag.prompts import Message
 
 logger = logging.getLogger(__name__)
@@ -30,33 +24,37 @@ def pick_device() -> tuple[str, torch.dtype]:
     return "cpu", torch.float32
 
 
-@lru_cache(maxsize=1)
-def _load() -> tuple[PreTrainedTokenizerBase, PreTrainedModel]:
-    device, dtype = pick_device()
-    tokenizer = AutoTokenizer.from_pretrained(GEN_MODEL)
-    # Placed explicitly rather than with device_map="auto", which silently offloaded
-    # weights to disk on a 16 GB Mac and later crashed (docs/decisions.md, D12).
-    model = AutoModelForCausalLM.from_pretrained(GEN_MODEL, dtype=dtype).to(device)
-    logger.info("Loaded %s on %s (%s)", GEN_MODEL, model.device, dtype)
-    if device == "cpu":
-        logger.warning("No GPU found: generation will be much slower than on a GPU")
-    return tokenizer, model
+class HuggingFaceGenerator:
+    """Generator backed by a Hugging Face chat model, loaded once when constructed."""
 
+    def __init__(self, model_name: str, max_new_tokens: int) -> None:
+        device, dtype = pick_device()
+        self._tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # Placed explicitly rather than with device_map="auto", which silently offloaded
+        # weights to disk on a 16 GB Mac and later crashed (docs/decisions.md, D12).
+        self._model = AutoModelForCausalLM.from_pretrained(model_name, dtype=dtype).to(device)
+        self._max_new_tokens = max_new_tokens
+        # One model instance serves every request, so run one generation at a time.
+        self._lock = threading.Lock()
+        logger.info("Loaded %s on %s (%s)", model_name, self._model.device, dtype)
+        if device == "cpu":
+            logger.warning("No GPU found: generation will be much slower than on a GPU")
 
-def generate(messages: list[Message], max_new_tokens: int = MAX_NEW_TOKENS) -> str:
-    """Generate a reply to chat `messages` with greedy decoding (same input, same answer)."""
-    tokenizer, model = _load()
-    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-    with torch.no_grad():
-        # Qwen's generation config ships sampling settings; clear them since we decode greedily.
-        output = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            temperature=None,
-            top_p=None,
-            top_k=None,
+    def generate(self, messages: list[Message]) -> str:
+        """Reply to chat `messages` with greedy decoding (same input, same answer)."""
+        prompt = self._tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
         )
-    new_tokens = output[0][inputs["input_ids"].shape[1] :]
-    return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+        inputs = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
+        with self._lock, torch.no_grad():
+            # Qwen's generation config ships sampling settings; clear them since we decode greedily.
+            output = self._model.generate(
+                **inputs,
+                max_new_tokens=self._max_new_tokens,
+                do_sample=False,
+                temperature=None,
+                top_p=None,
+                top_k=None,
+            )
+        new_tokens = output[0][inputs["input_ids"].shape[1] :]
+        return self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
