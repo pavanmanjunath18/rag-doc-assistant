@@ -14,3 +14,4 @@ Start here if you are new to the project (or explaining it to someone).
 2. [Stage 2: FastAPI service](stages/stage-2-fastapi-service.md)
 3. [Stage 3: idempotent ingestion](stages/stage-3-idempotent-ingestion.md)
 4. [Stage 4: background ingestion jobs](stages/stage-4-background-jobs.md)
+5. [Stage 5: evaluation harness](stages/stage-5-evaluation.md)

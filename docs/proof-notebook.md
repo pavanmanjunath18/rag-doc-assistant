@@ -51,7 +51,7 @@ added the senior notes and the undrawn revolving credit facility into a "total d
 document never states. The notebook did not fix this. This repo adds a guardrail line to the
 prompt (see [decisions.md](decisions.md), D5). When this repo re-ran the notebook's exact
 prompt on a Mac (float16, 1 greedy + 5 sampled runs), the $17.5B sum did not reproduce, so
-whether the guardrail prevents it is still open and is measured in Stage 5.
+whether the guardrail prevents it is still open and is measured in Stage 5. Stage 5 result: the benchmark debt question is fixed, but a held-out question asking for total debt including the WBD financing still made the model start summing (see [stage 5 notes](stages/stage-5-evaluation.md)).
 
 **Stale cells.** The cells ran out of order (execution counts 7, 25, 8, ..., 22, 23, 24, 19),
 and cell 9 shows the revised prompt in its code but the old refusal in its output. Output on

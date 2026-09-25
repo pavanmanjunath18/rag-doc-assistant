@@ -3,7 +3,7 @@
 Ask questions about your own documents (PDFs, text) and get answers grounded in them, with sources.
 Runs fully locally: MiniLM embeddings, Chroma vector store, and a small open model (Qwen2.5-1.5B) for generation.
 
-> Work in progress. Evaluation and a web UI are coming in later stages.
+> Work in progress. A web UI is coming in a later stage.
 
 ## Quick start
 
@@ -33,6 +33,20 @@ uvicorn --factory api.app:create_app --port 8000
 | `POST /query` | `{"question": "...", "top_k": 3, "use_rag": true}` returns an answer with its sources |
 
 Interactive API docs: `http://127.0.0.1:8000/docs`.
+
+## Evaluation
+
+```bash
+python -m eval.run_eval    # writes eval/results.md
+```
+
+| Question set | No retrieval | RAG | Retrieval hit@3 |
+|---|---|---|---|
+| Benchmark (8 questions from the proof notebook) | 1/8 correct | 6/8 correct | 6/8 |
+| Held-out (9 new questions, not used for tuning) | 2/9 correct* | 4/9 correct | 5/8 |
+
+\* both are refusals on questions where declining counts as correct. Full results and
+caveats: [eval/results.md](eval/results.md), [stage 5 notes](docs/stages/stage-5-evaluation.md).
 
 ## Tests and linting
 

@@ -31,6 +31,9 @@ sometimes a few characters under 150.
 **Why:** Comparable results; less text for a 1.5B model to get confused by.
 **Tradeoff:** The notebook's operating-margin answer missed 29.5%, which may be a retrieval
 miss that a larger k would fix. Stage 5 measures hit@k instead of guessing.
+**Stage 5 result:** For operating margin, the right chunk ranks 4th or 5th (hit@3 no, hit@5
+yes), so k=5 would fix that one question. But on the held-out set hit@5 equals hit@3 (5 of
+8), so a bigger k isn't the main fix; ranking is.
 
 ## D4. RAG prompt: the notebook's template, made document-agnostic (Stage 1b)
 
@@ -77,6 +80,12 @@ Qwen2.5-1.5B, float16 on an Apple GPU):
 after seeing results on the same questions, so it is tuned to this benchmark. The notebook's
 $17.5B sum did not reproduce in 6 runs without the guardrail either, so this run can't show
 that the guardrail prevents it. Stage 5 should measure both on questions not used here.
+
+**Stage 5 result:** On the benchmark debt question the answer is now the $14.5B of senior
+notes with no sum. But on a held-out question that asks directly for "total debt, including
+the financing for the WBD transaction", the model started adding $14.5B + $3B + $42.2B and was
+only stopped by the token limit. So the guardrail reduces over-synthesis but does not prevent
+it when the question itself asks for a total. See [eval/results.md](../eval/results.md).
 
 ## D6. Greedy decoding (Stage 1b)
 
@@ -318,3 +327,49 @@ pipeline passes the upload's real name.
 The bug was there since Stage 2, but those tests only checked the status code, not the
 message. The API tests now check that the error contains the user's file name and not the
 temp name.
+
+## D31. A rule-based grader, not an LLM judge (Stage 5)
+
+**Decision:** Each question in `eval/questions.json` lists key facts (every group must match),
+forbidden strings (any match is wrong), and whether a refusal is required or acceptable.
+`rag/evaluation.py` applies those rules to normalized text. Grades are `correct`, `partial`,
+`refused` or `wrong`.
+**Why:** Every verdict traces back to a string in a file anyone can read and argue with. It's
+deterministic and free. An LLM judge would need a stronger model than the one being graded
+(an API key and cost), and its verdicts would themselves need checking.
+**Tradeoff:** It only checks for the listed facts, not everything else in the answer. For
+example, a baseline answer that says Netflix doesn't pay dividends and then invents
+"dividend equivalent units" still counts as correct. It can also be fooled by phrasing it
+doesn't anticipate, which happened once: see D34.
+
+## D32. A held-out question set (Stage 5)
+
+**Decision:** Besides the 8 notebook questions, 9 new questions were written in Stage 5 and
+never used to tune the prompt. They include a total-debt trap and one question the documents
+can't answer. Results are reported per set.
+**Why:** The guardrail wording was chosen by looking at the benchmark questions (D5). Scoring
+only on those would overstate how well it works.
+
+## D33. Evaluation builds its own index and records how it ran (Stage 5)
+
+**Decision:** `python -m eval.run_eval` indexes `data/corpus` into a temporary folder, runs
+every question with and without retrieval, and writes `eval/results.md` (readable) and
+`eval/results.json` (everything, including full answers). The results record the date, git
+commit, device, model and settings.
+**Why:** Results don't depend on whatever is in your own `chroma_db/`, and anyone can see
+exactly what produced a number. This is the fix for the notebook's stale-cell problem: a
+script that runs top to bottom in a fresh process. Two runs gave identical answers for all
+17 questions, which also confirms greedy decoding makes runs repeatable (D6).
+**Also:** The notebook's own recorded answers (`eval/notebook_answers.json`, extracted from
+the notebook file) are re-scored with the same grader, so the comparison with the notebook
+uses one ruler.
+
+## D34. Summing language counts as wrong (Stage 5)
+
+**Decision:** For the two debt questions, phrases like "adding these", "+ $" and "sum of"
+are forbidden, as well as the computed totals.
+**Why:** In the first run, the total-debt-trap answer began "Adding these components
+together gives us: $14.5 billion + $3 billion + $42.2" and was cut off by the 200-token limit
+before writing a total. No forbidden number appeared, so the grader called it correct. That
+was a false pass, and it hid the most important held-out finding. A test now uses that exact
+answer.
