@@ -373,3 +373,34 @@ together gives us: $14.5 billion + $3 billion + $42.2" and was cut off by the 20
 before writing a total. No forbidden number appeared, so the grader called it correct. That
 was a false pass, and it hid the most important held-out finding. A test now uses that exact
 answer.
+
+## D35. React with no component library (Stage 6)
+
+**Decision:** Vite's `react-ts` template, four components, one plain CSS file. No UI kit,
+no Tailwind, no state library.
+**Why:** The UI is two forms, a list and an answer. A library would add more code to explain
+than it saves.
+**Tradeoff:** Styling and accessibility details (labels, focus outlines, `aria-live` regions)
+are done by hand.
+
+## D36. One origin through a proxy, no CORS (Stage 6)
+
+**Decision:** The UI calls `/api/...`. In development Vite forwards those requests to
+FastAPI; in Docker, nginx does. The API has no CORS middleware.
+**Why:** The browser never makes a cross-origin request, so there's no CORS policy to
+configure or get wrong. It's also how the app would sit behind a load balancer in production.
+
+## D37. Poll the job every second (Stage 6)
+
+**Decision:** Each upload row calls `GET /jobs/{id}` every second until it finishes.
+**Why:** Jobs take seconds, and there are only ever a few in flight. Polling uses the same
+endpoint any API client would use.
+**Alternatives:** Server-sent events or WebSockets would push updates instantly, but add a
+long-lived connection type to the server for no visible gain here.
+
+## D38. Hand-written TypeScript types (Stage 6)
+
+**Decision:** `frontend/src/api.ts` declares the response types by hand, mirroring
+`api/schemas.py`.
+**Tradeoff:** They can drift from the Pydantic models. Generating them from FastAPI's OpenAPI
+schema would remove that risk; with five small types, hand-written is easier to read.

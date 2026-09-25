@@ -3,7 +3,7 @@
 Ask questions about your own documents (PDFs, text) and get answers grounded in them, with sources.
 Runs fully locally: MiniLM embeddings, Chroma vector store, and a small open model (Qwen2.5-1.5B) for generation.
 
-> Work in progress. A web UI is coming in a later stage.
+> Work in progress: packaging (Docker, CI) comes next.
 
 ## Quick start
 
@@ -33,6 +33,15 @@ uvicorn --factory api.app:create_app --port 8000
 | `POST /query` | `{"question": "...", "top_k": 3, "use_rag": true}` returns an answer with its sources |
 
 Interactive API docs: `http://127.0.0.1:8000/docs`.
+
+## Web UI
+
+```bash
+cd frontend && npm install && npm run dev    # http://localhost:5173 (API must be on :8000)
+```
+
+Upload a document, watch its ingestion job, ask a question, and expand each cited source to
+see the exact chunk the answer came from.
 
 ## Evaluation
 
