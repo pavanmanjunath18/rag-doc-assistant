@@ -29,3 +29,11 @@ def test_non_integer_value_gives_a_clear_error(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("TOP_K", "three")
     with pytest.raises(ValueError, match="TOP_K must be an integer, got 'three'"):
         Settings.from_env()
+
+
+def test_env_example_lists_every_setting() -> None:
+    # .env.example is the documentation for configuration, so it must stay complete.
+    example = (Path(__file__).resolve().parent.parent / ".env.example").read_text()
+    names = {line.split("=", 1)[0] for line in example.splitlines() if "=" in line}
+    fields = {name.upper() for name in Settings.__dataclass_fields__}
+    assert names == fields

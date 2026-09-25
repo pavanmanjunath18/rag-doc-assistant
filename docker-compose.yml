@@ -1,0 +1,34 @@
+# docker compose up --build   then open http://localhost:8080  (WEB_PORT=8090 to change the port)
+#
+# The first start downloads both models (about 3 GB) into the "models" volume, so the API
+# takes several minutes to become healthy. Later starts reuse the volume.
+
+services:
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Pinned here so values copied from .env.example can't move data off the volumes.
+      CHROMA_DIR: /data/chroma
+      UPLOAD_DIR: /data/uploads
+      JOBS_DB: /data/jobs.sqlite3
+      HF_HOME: /models
+    volumes:
+      - data:/data      # vector index, uploaded files, job table
+      - models:/models  # Hugging Face model cache
+    expose:
+      - "8000"
+
+  web:
+    build: ./frontend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  data:
+  models:
