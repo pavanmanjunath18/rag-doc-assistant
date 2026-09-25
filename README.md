@@ -3,7 +3,7 @@
 Ask questions about your own documents (PDFs, text) and get answers grounded in them, with sources.
 Runs fully locally: MiniLM embeddings, Chroma vector store, and a small open model (Qwen2.5-1.5B) for generation.
 
-> Work in progress. Background ingestion, evaluation, and a web UI are coming in later stages.
+> Work in progress. Evaluation and a web UI are coming in later stages.
 
 ## Quick start
 
@@ -28,7 +28,8 @@ uvicorn --factory api.app:create_app --port 8000
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | Status and number of indexed chunks |
-| `POST /documents` | Upload a `.pdf`, `.txt` or `.md` file (multipart field `file`) and index it. Re-uploading identical content is a no-op; a changed file with the same name replaces its old chunks |
+| `POST /documents` | Upload a `.pdf`, `.txt` or `.md` file (multipart field `file`). Returns `202` with a `job_id`; indexing runs in the background. Re-uploading identical content is a no-op; a changed file with the same name replaces its old chunks |
+| `GET /jobs/{job_id}` | Job status (`queued`, `running`, `succeeded`, `failed`), the error if it failed, the result if it succeeded |
 | `POST /query` | `{"question": "...", "top_k": 3, "use_rag": true}` returns an answer with its sources |
 
 Interactive API docs: `http://127.0.0.1:8000/docs`.

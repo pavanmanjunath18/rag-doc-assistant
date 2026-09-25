@@ -259,7 +259,7 @@ again (which deletes everything except the current version, so it heals itself).
 cleaned up automatically on the next ingest. Verified on the real index: 35 old-format chunks
 became 35 new ones, 0 left behind.
 
-## D25. 200 for "already indexed", 201 for "indexed" (Stage 3)
+## D25. 200 for "already indexed", 201 for "indexed" (Stage 3, replaced by D29 in Stage 4)
 
 **Decision:** `POST /documents` returns `status` (`indexed`, `replaced` or `unchanged`) and
 `document_id`. The HTTP code is 201 when something was stored, 200 when nothing changed.
@@ -268,7 +268,53 @@ chunk counts.
 **Known gap:** Two uploads of the same file name at the same moment could interleave their
 store and delete steps. Stage 4 runs ingestion jobs one at a time, which removes that race.
 
-## Deferred to later stages
+## D26. Background jobs: a SQLite table and one worker thread (Stage 4)
 
-- **Uploads block the request** (Stage 4): `/documents` indexes before responding. Fine for the
-  10-K sections (under a second each); a long PDF would hold the request open.
+**Decision:** `POST /documents` records a job in a SQLite table (`rag/jobs.py`) and hands
+the work to a single background thread, which runs jobs one at a time and updates the row:
+`queued` then `running` then `succeeded` or `failed` (with the error text).
+**Why:** A long PDF no longer holds the HTTP request open. SQLite comes with Python, needs no
+extra server, and keeps job history across restarts. One worker is enough: there's one
+embedding model in memory, and running jobs in order removes the Stage 3 race where two
+uploads of the same file name could interleave their add and delete steps.
+**Alternatives:**
+- FastAPI `BackgroundTasks`: simplest, but it keeps no status to poll, loses everything on
+  restart, and runs tasks concurrently in the thread pool (so the race comes back).
+- Celery or RQ with Redis: real retries and multiple workers, but an extra service to run and
+  explain, for a one-person local tool.
+- A hosted workflow service: the planned AWS version (Step Functions) fills this role there.
+**Tradeoff:** Single process only. The in-memory queue isn't bounded, so a flood of uploads
+just waits in line. Scaling out would mean moving the queue out of the process.
+
+## D27. Cheap checks in the request, expensive work in the job (Stage 4)
+
+**Decision:** Filename, extension, size and content-sniffing still run before responding
+(400/413/415 immediately). Parsing, embedding and storing happen in the job, so a PDF that
+turns out to be unreadable is reported as a failed job with the reason.
+**Why:** The client gets instant feedback for mistakes that cost nothing to detect, and a
+job is only created for files that are plausibly valid.
+
+## D28. After a restart, unfinished jobs fail loudly (Stage 4)
+
+**Decision:** At startup, any job still `queued` or `running` is marked `failed` with "The
+server restarted before this job finished. Upload the file again.", and leftover
+`.upload-*` temp files are deleted.
+**Why:** Otherwise those jobs would say `running` forever. Automatic retry was considered,
+but the temp file may be half-written and the user may no longer care, so asking for a
+re-upload is simpler and honest. Because ingestion is idempotent (D22), re-uploading is safe.
+
+## D29. `202 Accepted` plus a job to poll (Stage 4)
+
+**Decision:** Upload returns 202 with `job_id` and a `Location: /jobs/{id}` header.
+`GET /jobs/{id}` returns the status, timestamps, the error if it failed, and the ingest result
+(`document_id`, name cited under, chunk count, `indexed` / `replaced` / `unchanged`) if it
+succeeded. Unknown IDs return 404. This replaces the 200/201 distinction from D25.
+
+## D30. Errors name the user's file, not the temp file (Stage 4)
+
+**Decision:** `load_text(path, name)` takes the display name to use in messages, and the
+pipeline passes the upload's real name.
+**Why:** A Stage 4 test caught that failed uploads reported names like `.upload-c2plpu6s.pdf`.
+The bug was there since Stage 2, but those tests only checked the status code, not the
+message. The API tests now check that the error contains the user's file name and not the
+temp name.
