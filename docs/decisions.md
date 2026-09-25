@@ -1,0 +1,146 @@
+# Design decisions
+
+Each entry: what was decided, why, what else was considered, and what it costs.
+"Notebook" means the proof notebook, summarised in [proof-notebook.md](proof-notebook.md).
+
+## D1. Chunk size 800 characters, overlap 150 (Stage 1b)
+
+**Decision:** Keep the notebook's values.
+**Why:** They produced correct answers on 5 of 8 benchmark questions, and keeping them makes
+this repo's results comparable with the notebook.
+**Alternatives:** Token-based chunking; sentence or paragraph splitting.
+**Tradeoff:** Characters are not tokens, so chunk length in tokens varies a little. Fine for a
+model with a large context window and only 3 chunks per prompt.
+
+## D2. Chunk edges snap to whitespace; line breaks are kept (Stage 1b)
+
+**Decision:** Unlike the notebook's raw slicing, a chunk never ends or starts mid-word, and
+text is not whitespace-flattened.
+**Why:** Raw slicing can cut a figure in half (for example `$45,183,0` | `36`), which is a real
+risk for financial questions. Keeping line breaks keeps headings like `INDEBTEDNESS` visible
+to the model.
+**Alternatives:** Match the notebook exactly; paragraph-first splitting. Paragraph-first was
+considered to stop sections mixing, but the notebook's debt error came from two figures in
+the same paragraph, so it would not have helped.
+**Tradeoff:** The corpus gives 35 chunks instead of the notebook's 37, and the overlap is
+sometimes a few characters under 150.
+
+## D3. Retrieve the top 3 chunks (Stage 1b)
+
+**Decision:** Keep the notebook's `TOP_K=3` (the Stage 1 scaffold had 5).
+**Why:** Comparable results; less text for a 1.5B model to get confused by.
+**Tradeoff:** The notebook's operating-margin answer missed 29.5%, which may be a retrieval
+miss that a larger k would fix. Stage 5 measures hit@k instead of guessing.
+
+## D4. RAG prompt: the notebook's template, made document-agnostic (Stage 1b)
+
+**Decision:** Use the notebook's final prompt: a soft refusal ("only if you find nothing
+relevant at all") and a synonym hint ("debt" may appear as "notes", "indebtedness",
+"liabilities"), sent as a single user message. "Netflix's annual report" became "the provided
+documents".
+**Why:** The Stage 1 scaffold used a strict "ONLY the context, otherwise say you don't know"
+prompt, which is the style that caused the notebook's first failure. The app accepts any
+upload, so the prompt should not name one company.
+**Tradeoff:** The synonym hint is finance-flavoured. It's kept as an example of the idea and
+does no harm on other documents, but it is not tuned for them.
+
+## D5. Guardrail against combining figures (Stage 1b)
+
+**Decision:** Add one line to the prompt: "Quote each figure exactly as it appears in the
+context, and do not add figures together to make a new total."
+**Why:** The notebook's model summed senior notes and an undrawn credit facility into a
+"total debt" that the document never states.
+**Tradeoff:** This discourages legitimate arithmetic questions ("what is revenue minus
+costs?"). For a document Q&A tool, a wrong confident number is worse than no calculation.
+
+**How the wording was chosen (first manual run, Stage 1b).** The first version said "Report
+figures exactly as they are stated. Do not add, combine, or calculate figures, and do not give
+a total unless the context states one." With it, the model answered "How much debt does
+Netflix have?" with "The context does not contain this information", even though the top
+chunk contained the $14.5B figure. Testing one change at a time (same retrieved chunks,
+Qwen2.5-1.5B, float16 on an Apple GPU):
+
+- Removing the line fixed the refusal (6 of 6 runs with it refused, 0 of 6 without, across
+  greedy and 5 sampled seeds). Changing "provided documents" back to "Netflix's annual report"
+  made no difference. So the guardrail itself caused it, most likely because "don't give a
+  total unless stated" collides with "how much", which reads as asking for a total.
+- Removing the line entirely made the model refuse the WBD termination-fee question instead.
+- Four wordings were compared on the 8 benchmark questions plus "What is Netflix's total
+  debt?" (one greedy run each). The chosen wording was the only one with no refusals and no
+  wrong answers: 6 correct, 2 partial (cybersecurity oversight, operating margin). A shorter
+  wording ("Quote figures exactly... Do not add figures together or calculate new ones.")
+  refused the debt question and garbled the stock-split answer.
+- All wordings answered "What is Netflix's total debt?" with the refusal message rather than
+  a sum. That is acceptable, since no total is stated.
+
+**Limits of this evidence:** one model, mostly single greedy runs, and the wording was picked
+after seeing results on the same questions, so it is tuned to this benchmark. The notebook's
+$17.5B sum did not reproduce in 6 runs without the guardrail either, so this run can't show
+that the guardrail prevents it. Stage 5 should measure both on questions not used here.
+
+## D6. Greedy decoding (Stage 1b)
+
+**Decision:** `do_sample=False`. The notebook used Qwen's default sampling.
+**Why:** The same question gives the same answer, which evaluation needs. With sampling, a
+changed answer could be the prompt, the retrieval, or just randomness.
+**Tradeoff:** Stage 5 results may not match the notebook answer for answer. Differences will
+be reported, not hidden.
+
+## D7. 200 new tokens (Stage 1b)
+
+**Decision:** Keep the notebook's `MAX_NEW_TOKENS=200` (Stage 1 had 256). Configurable.
+**Tradeoff:** Long answers get cut off (one notebook baseline answer was). RAG answers were
+short, so this didn't affect them.
+
+## D8. Normalised embeddings with cosine distance (Stage 1)
+
+**Decision:** Keep Stage 1's `normalize_embeddings=True` and a cosine Chroma collection. The
+notebook used defaults (L2 distance).
+**Why:** `all-MiniLM-L6-v2` already outputs unit-length vectors, and on unit vectors L2 and
+cosine give the same ranking, so retrieval matches the notebook. Cosine gives a readable
+score (1 = identical meaning), which is shown next to each source.
+
+## D9. Baseline is the bare question (Stage 1b)
+
+**Decision:** No system prompt for the baseline, matching the notebook (Stage 1 added
+"Answer the question concisely.").
+**Note:** With no system message, Qwen's chat template inserts its own default one ("You are
+Qwen, created by Alibaba Cloud..."). That is why a baseline answer mentions Alibaba Cloud.
+
+## D10. Sources in rank order, one per chunk, with scores (Stage 1b)
+
+**Decision:** Return every retrieved chunk in the order it was ranked, with file, chunk number
+and score. Stage 1 returned a sorted, de-duplicated set of names.
+**Why:** Sorting hid which chunk was most relevant, and de-duplicating hid that two chunks came
+from the same file. The UI (Stage 6) needs this to show citations.
+
+## D11. Prompts live in their own module (Stage 1b)
+
+**Decision:** `rag/prompts.py` builds messages and imports nothing heavy.
+**Why:** Prompt wording is the thing most likely to change and most worth testing, and the tests
+shouldn't need a 3 GB model.
+
+## D12. Pick the device explicitly; float16 on any GPU (Stage 1b)
+
+**Decision:** `pick_device()` chooses an NVIDIA GPU (`cuda`), then an Apple GPU (`mps`), then
+CPU. GPUs load the model in float16, CPUs in float32. The model is moved there with `.to()`
+instead of `device_map="auto"`, and the `accelerate` dependency was dropped.
+**Why:** The scaffold used float16 only on CUDA, so on a Mac the 1.5B model loaded in float32
+(about 6.2 GB). On a 16 GB Mac already deep in swap, `device_map="auto"` quietly offloaded
+some weights to disk ("Some parameters are on the meta device because they were offloaded to
+the disk"), and in another shell the same load crashed with a segmentation fault (exit 139).
+In float16 on `mps` the model takes 3.09 GB, loads in about 5 s, and a full CLI question runs
+in about 15 s including loading both models. This is the same class of problem as the proof
+project's CPU-vs-GPU failure: where the model runs, and in what precision, is part of
+correctness, not just speed.
+**Tradeoff:** No automatic splitting of a model that doesn't fit on one device. That doesn't
+matter for a 1.5B model, and a clear out-of-memory error is easier to debug than silent disk
+offload.
+
+## Deferred to later stages
+
+- **Stale chunks** (Stage 3): chunk IDs are `filename:index`, so re-ingesting a shorter version
+  of a file leaves its old tail chunks behind.
+- **Global model singletons** (Stage 2): `lru_cache` loaders get replaced by small interfaces
+  (`Embedder`, `Generator`, `VectorStore`) passed in at startup. This makes testing with fakes
+  easy and is the seam for swapping in AWS services later.
