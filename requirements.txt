@@ -1,0 +1,6 @@
+chromadb>=0.5
+sentence-transformers>=3.0
+transformers>=4.56
+torch
+pypdf>=4.0
+python-dotenv>=1.0

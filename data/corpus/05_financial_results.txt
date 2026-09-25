@@ -1,0 +1,41 @@
+NETFLIX 10-K (Fiscal Year 2025) — ITEM 7: MANAGEMENT'S DISCUSSION AND ANALYSIS (KEY FINANCIAL RESULTS)
+
+CONSOLIDATED PERFORMANCE HIGHLIGHTS
+For the year ended December 31, 2025:
+- Total revenues: $45,183,036 thousand ($45.2 billion), up 16% from $39,000,966 thousand ($39.0 billion) in 2024. Revenues in 2023 were $33,723,297 thousand ($33.7 billion).
+- Constant currency change in revenues for 2025 vs 2024: 17%
+- Operating income: $13,326,603 thousand ($13.3 billion), up 28% from $10,417,614 thousand ($10.4 billion) in 2024
+- Operating margin: 29.5% in 2025, compared to 26.7% in 2024 and 20.6% in 2023
+- Net income: $10,981,201 thousand ($11.0 billion), up 26% from $8,711,631 thousand ($8.7 billion) in 2024
+
+During the year ended December 31, 2025, Netflix discontinued the reporting of membership numbers, including average paying memberships and average monthly revenue per paying membership, focusing instead on revenue and operating margin as the primary financial metrics that best represent business performance.
+
+Operating margin for 2025 increased by approximately three percentage points compared to 2024, primarily driven by the growth in revenues outpacing the growth in cost of revenues, sales and marketing, and general and administrative expenses.
+
+Net income for 2025 increased $2,270 million compared to 2024, primarily due to a $2,909 million increase in operating income, driven by a $6,182 million increase in revenues and partially offset by a $2,237 million increase in cost of revenues primarily due to the increase in content amortization.
+
+REVENUES
+Netflix primarily derives revenues from monthly membership fees for services related to streaming content. As of December 31, 2025, pricing on paid plans ranged from the U.S. dollar equivalent of $1 to $37 per month, and pricing on extra member sub accounts ranged from the U.S. dollar equivalent of $2 to $9 per month.
+
+Revenue growth in 2025 was primarily due to growth in memberships, price increases, and increased advertising revenue, partially offset by unfavorable changes in foreign exchange rates.
+
+STREAMING REVENUES BY REGION (Year ended December 31, 2025):
+- United States and Canada (UCAN): $19,957,152 thousand ($20.0 billion), up 15% from 2024
+- Europe, Middle East, and Africa (EMEA): $14,514,646 thousand ($14.5 billion), up 17% from 2024
+- Latin America (LATAM): $5,357,521 thousand ($5.4 billion), up 11% from 2024 (23% on a constant currency basis)
+- Asia-Pacific (APAC): $5,353,717 thousand ($5.4 billion), up 21% from 2024
+
+COST OF REVENUES
+Cost of revenues primarily consists of the amortization of content assets. Other costs include expenses associated with the acquisition, licensing and production of content, streaming delivery costs, and other operating costs. Streaming delivery costs are primarily related to the global content delivery network called Open Connect, which Netflix built to efficiently stream a high volume of content to members over the internet.
+
+Cost of revenues for 2025 was $23,275,329 thousand ($23.3 billion), up 11% from 2024, representing 52% of revenues (down from 54% in 2024 and 58% in 2023). The increase was primarily due to a $1,121 million increase in content amortization coupled with a $1,116 million increase in other cost of revenues, primarily driven by non-income tax assessments in Brazil.
+
+OPERATING EXPENSES
+- Sales and marketing expenses for 2025: $3,301,306 thousand ($3.3 billion), up 13%, representing 7% of revenues
+- Technology and development expenses for 2025: $3,391,390 thousand ($3.4 billion), up 16%, representing 8% of revenues
+- General and administrative expenses for 2025: $1,888,408 thousand ($1.9 billion), up 11%, representing 4% of revenues
+
+The increase in general and administrative expenses was partly attributable to higher legal fees and transaction-related costs, including those associated with the WBD (Warner Bros. Discovery) transaction.
+
+INTEREST EXPENSE
+Interest expense for 2025 was $776,510 thousand ($777 million), up 8% from 2024, consisting primarily of interest on senior notes of $716 million. The increase was primarily driven by higher amortization of debt issuance costs, including approximately $60 million related to financing arrangements entered into in connection with the WBD transaction.

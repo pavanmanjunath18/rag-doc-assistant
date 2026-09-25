@@ -1,0 +1,19 @@
+NETFLIX 10-K (Fiscal Year 2025) — ITEM 1C: CYBERSECURITY
+
+SECURITY PROGRAM
+Netflix has an enterprise-wide information security program designed to identify, protect, detect and respond to and manage reasonably foreseeable cybersecurity risks and threats. To protect information systems from cybersecurity threats, Netflix uses various security tools that help prevent, identify, escalate, investigate, resolve and recover from identified vulnerabilities and security incidents in a timely manner. These include internal reporting, monitoring and detection tools, and a bug bounty program to allow security researchers to assist in identifying vulnerabilities in products before they are exploited by malicious threat actors.
+
+Netflix also maintains a third party security program to identify, prioritize, assess, mitigate and remediate third party risks; however, Netflix relies on the third parties it uses to implement security programs commensurate with their risk, and cannot ensure in all circumstances that their efforts will be successful.
+
+RISK ASSESSMENT AND TESTING
+Netflix regularly assesses risks from cybersecurity and technology threats and monitors information systems for potential vulnerabilities. The company uses a widely-adopted risk quantification model to identify, measure and prioritize cybersecurity and technology risks and develop related security controls and safeguards. Netflix conducts regular reviews and tests of the information security program and also leverages audits by its internal audit team, tabletop exercises, penetration and vulnerability testing, red team exercises, simulations, and other exercises to evaluate the effectiveness of the program and improve security measures and planning.
+
+Netflix engages an external auditor to conduct an annual payment card industry data security standard (PCI DSS) review of security controls protecting payment information, as well as third-party penetration testing of the cardholder environment and related systems. The results of these assessments are reported to the Audit Committee.
+
+INCIDENT HISTORY
+Netflix systems and those of third parties with which it does business have experienced and may continue to experience directed attacks intended to lead to interruptions and delays in service and operations as well as loss, misuse or theft of personal information and other data, confidential information or intellectual property. Netflix has experienced unauthorized releases of certain digital content assets and unintended disclosure of personal information due to incidents related to third parties. However, to date these incidents have not had a material impact on the service, systems or business. Generative AI could intensify these cybersecurity risks.
+
+GOVERNANCE
+The Senior Director, Security, Privacy & Assurance leads the global information security organization responsible for overseeing the Netflix information security program. This person has over 20 years of experience in information security and held senior leadership roles overseeing cybersecurity programs at other companies. Team members who support the information security program have relevant educational and industry experience, including holding similar positions at large technology companies. The teams provide regular reports to senior management and other relevant teams on various cybersecurity threats, assessments and findings.
+
+The Board oversees the annual enterprise risk assessment, where key risks within the company are assessed, including security and technology risks and cybersecurity threats. The Audit Committee of the Board oversees cybersecurity risk and receives regular reports from the Senior Director, Security, Privacy & Assurance on various cybersecurity matters, including risk assessments, mitigation strategies, areas of emerging risks, incidents and industry trends.
